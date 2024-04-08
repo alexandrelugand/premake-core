@@ -120,6 +120,25 @@
 --
 
 	function sln2005.projects(wks)
+
+		if wks.solutionitems and #wks.solutionitems > 0 then
+			-- root level
+			p.push('Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{' .. os.uuid("Solution Items:"..wks.name) .. '}"')
+			p.push("ProjectSection(SolutionItems) = preProject")
+			for _, file in pairs(wks.solutionitems) do
+				if type(_) == "number" and type(file) == "string" then
+					for _, file in ipairs(os.matchfiles(file)) do
+						file = path.rebase(file, ".", wks.location)
+						p.w(file.." = "..file)
+					end
+				end
+			end
+			p.pop("EndProjectSection")
+			p.pop("EndProject")
+			-- subprojects
+			sln2005.recursiveSolutionItemsProject(wks, wks.solutionitems)
+		end
+
 		local tr = p.workspace.grouptree(wks)
 		tree.traverse(tr, {
 			onleaf = function(n)
@@ -334,18 +353,25 @@
 --
 
 	function sln2005.nestedProjects(wks)
+
+		p.push("GlobalSection(NestedProjects) = preSolution")
+		-- base copy-paste START
 		local tr = p.workspace.grouptree(wks)
 		if tree.hasbranches(tr) then
-			p.push('GlobalSection(NestedProjects) = preSolution')
 			tree.traverse(tr, {
 				onnode = function(n)
 					if n.parent.uuid then
-						p.w('{%s} = {%s}', (n.project or n).uuid, n.parent.uuid)
+						p.w("{%s} = {%s}", (n.project or n).uuid, n.parent.uuid)
 					end
 				end
 			})
-			p.pop('EndGlobalSection')
 		end
+		-- base copy-paste END
+		-- our START
+		parent = "Solution Items"
+		sln2005.recursiveSolutionItemsNestedProjectLines(wks, parent, wks.solutionitems)
+		-- our END
+		p.pop("EndGlobalSection")
 	end
 
 
@@ -420,4 +446,63 @@
 
 	function sln2005.sections(wks)
 		p.callArray(sln2005.elements.sections, wks)
+	end
+
+
+--
+-- Files at solution scope
+--
+
+	function sln2005.recursiveSolutionItemsProject(wks, tbl)
+		for _, file in pairs(tbl) do
+			if type(_) ~= "number" then
+
+				local name = _
+				local tbl = file
+				p.push('Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "'..name..'", "'..name..'", "{' .. os.uuid("Solution Items:"..wks.name..":"..name) .. '}"')
+				p.push("ProjectSection(SolutionItems) = preProject")
+
+				local children = false
+
+				for _, file in pairs(file) do
+					if type(_) == "number" and type(file) == "string" then
+						for _, file in ipairs(os.matchfiles(file)) do
+							file = path.rebase(file, ".", wks.location)
+							p.w(file.." = "..file)
+						end
+					end
+
+					if type(_) ~= "number" then
+						children = true
+					end
+				end
+
+				p.pop("EndProjectSection")
+				p.pop("EndProject")
+
+				if children then
+					sln2005.recursiveSolutionItemsProject(wks, tbl)
+				end
+			end
+		end
+	end
+
+	function sln2005.recursiveSolutionItemsNestedProjectLines(wks, parent, tbl)
+		local parent_uuid
+		if parent == "Solution Items" then
+			parent_uuid = os.uuid("Solution Items:"..wks.name)
+		else
+			parent_uuid = os.uuid("Solution Items:"..wks.name..":"..parent)
+		end
+
+		for _, file in pairs(tbl) do
+			if type(_) ~= "number" then
+				local name = _
+				local new_tbl = file
+				project_uuid = os.uuid("Solution Items:"..wks.name..":"..name)
+				p.w("{%s} = {%s}", project_uuid, parent_uuid)
+				--print("child:", name, "parent:", parent)
+				sln2005.recursiveSolutionItemsNestedProjectLines(wks, name, new_tbl)
+			end
+		end
 	end

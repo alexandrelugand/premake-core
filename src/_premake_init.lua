@@ -992,6 +992,13 @@
 	}
 
 	api.register {
+		name = "pchoutputfile",
+		scope = "config",
+		kind = "string",
+		tokens = true,
+	}
+
+	api.register {
 		name = "pic",
 		scope = "config",
 		kind = "string",
@@ -1406,6 +1413,12 @@
 			p.X86,
 			p.X86_64,
 		}
+	}
+
+	api.register {
+		name = "solutionitems",
+		scope = "workspace",
+		kind = "table",
 	}
 
 	api.register {
